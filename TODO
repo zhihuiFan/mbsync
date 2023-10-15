@@ -1,0 +1,86 @@
+f{,data}sync() usage could be optimized by batching the calls.
+
+make SSL (connect) timeouts produce a bit more than "Unidentified socket error".
+
+automatically resume upon transient errors, e.g. "connection reset by peer"
+or timeout after some data was already transmitted.
+possibly also try to handle Exchange's "glitches" somehow.
+
+add support for IMAP UTF-7 (for internationalized mailbox names).
+
+uidvalidity lock timeout handling would be a good idea.
+
+should complain when multiple Channels match the same folders.
+
+propagate folder deletions even when the folders are non-empty.
+- verify that "most" of the folders in the Channel are still there.
+- refuse to delete unpropagated messages when trashing on the remote side.
+- refuse to delete far side if it has unpropagated messages. symmetry?
+
+add message expiration based on arrival date (message date would be too
+unreliable). MaxAge; probably mutually exclusive to MaxMessages.
+
+add alternative treatments of expired messages. ExpiredMessageMode: Prune
+(delete messages like now), Keep (just don't sync) and Archive (move to
+separate folder - ArchiveSuffix, default .archive).
+
+add support for event notification callbacks.
+it would be also possible to report more differentiated exit codes, but
+that seems too limiting in the general case.
+
+make it possible to have different mailbox names for far and near side in
+Patterns.
+- use far:near for the pattern
+  - for quoting, use more colons: the longest sequence of colons is the
+    separator
+- this makes Groups mostly useless, as they are mostly a workaround for this
+  function being missing so far
+- this is needed for move detection, which would work only within one Channel
+
+add regexp-based mailbox path rewriting to the drivers. user would provide
+expressions for both directions. every transformation would be immediately
+verified with the inverse transform. PathDelimiter and Flatten would become
+special cases of this.
+
+add daemon mode. primary goal: keep imap password in memory.
+also: idling mode.
+
+parallel fetching of multiple mailboxes.
+TLS session resumption becomes interesting then as well.
+
+imap_set_flags(): group commands for efficiency, don't call back until
+imap_commit().
+
+add streaming from fetching to storing.
+
+handle custom flags (keywords).
+
+make use of IMAP CONDSTORE extension (rfc4551; CHANGEDSINCE FETCH Modifier);
+make use of IMAP QRESYNC extension (rfc5162) to avoid SEARCH to find vanished
+messages.
+
+use MULTIAPPEND and FETCH with multiple messages.
+
+dummy messages resulting from MaxSize should contain a dump of the original
+message's MIME structure and its (reasonably sized) text parts.
+
+don't SELECT boxes unless really needed; in particular not for appending,
+and in write-only mode not before changes are made.
+problem: UIDVALIDITY change detection is delayed, significantly complicating
+matters.
+
+some error messages are unhelpful in non-verbose mode due to missing context.
+
+possibly use ^[[1m to highlight error messages.
+
+consider alternative approach to trashing: instead of the current trash-before-
+expunge done by mbsync, let MUAs do the trashing (as modern ones typically do).
+mbsync wouldn't do any trashing by itself, but should track the moves for
+optimization. additionally, there should be a mode to move trashed messages to
+the remote store. TrashMode Internal|External, AbsorbRemoteTrash.
+a yet different approach to trashing is treating the trash like a normal mailbox.
+however, this implies a huge working set.
+
+consider optional use of messages-id (and X-GM-MSGID):
+- detection of message moves between folders
+- recovery from loss of sync state, migration from other tools

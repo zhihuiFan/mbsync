@@ -1,0 +1,78 @@
+ _                      
+(_)___ _   _ _ __   ___ 
+| / __| | | | '_ \ / __|
+| \__ \ |_| | | | | (__ 
+|_|___/\__, |_| |_|\___|
+       |___/            
+isync/mbsync - free (GPL) mailbox synchronization program
+http://isync.sf.net/
+
+See AUTHORS for contact information.
+
+``mbsync'' is a command line application which synchronizes mailboxes;
+currently Maildir and IMAP4 mailboxes are supported. New messages, message
+deletions and flag changes can be propagated both ways.
+``mbsync'' is suitable for use in IMAP-disconnected mode.
+
+Synchronization is based on unique message identifiers (UIDs), so
+no identification conflicts can occur (unlike with some other mail
+synchronizers).
+Synchronization state is kept in one local text file per mailbox pair;
+these files are protected against concurrent ``mbsync'' processes.
+Mailboxes can be safely modified while ``mbsync'' operates.
+Multiple replicas of each mailbox can be maintained.
+
+isync is the project name, while mbsync is the current executable name; this
+change was necessary because of massive changes in the user interface.
+
+* Features
+
+    * Fine-grained selection of synchronization operations to perform
+    * Synchronizes single mailboxes or entire mailbox collections
+    * Partial mirrors possible: keep only the latest messages locally
+    * Trash functionality: backup messages before removing them
+    * IMAP features:
+	* Supports TLS/SSL via imaps: (port 993) and STARTTLS
+	* Supports SASL for authentication
+	* Pipelining for maximum speed
+
+* Compatibility
+
+    isync should work fairly well with any IMAP4 compliant server;
+    servers that support the UIDPLUS and LITERAL+ extensions are most
+    efficient.
+
+    Courier 1.4.3 is known to be buggy, version 1.7.3 works fine.
+
+    M$ Exchange (2013 at least) needs DisableExtension MOVE to be compatible
+    with the Trash functionality.
+
+* Platforms
+
+    At some point, ``isync'' has successfully run on:
+    Linux, Solaris 2.7, OpenBSD 2.8, FreeBSD 4.3.
+
+* Requirements
+
+    perl v5.14+
+    Berkeley DB 4.1+ (optional)
+    OpenSSL for TLS/SSL support (optional)
+    Cyrus SASL (optional)
+    zlib (optional)
+
+  The build from git also requires:
+
+    GNU autotools (autoconf & automake)
+    perl module Date::Parse (libtimedate-perl on Debian, perl-TimeDate on
+                             Fedora and Suse)
+
+* Installation
+
+    ./autogen.sh (only when building from git)
+    ./configure
+    make
+    sudo make install
+
+* Help
+
+    Please see the man page for complete documentation.

@@ -1,0 +1,189 @@
+Reading configuration file /home/yizhi.fzh/.mbsyncrc
+Channel 163
+Opening far side store 163-remote...
+F: [ 1] Enter connect_store
+Resolving imap.163.com... ok
+Connecting to imap.163.com (103.74.29.45:143)... 
+F: [ 1] Leave connect_store
+Opening near side store 163-local...
+N: [ 2] Enter connect_store
+N: [ 2] Callback enter connect_store, sts=0
+pattern '*' (effective '*'): Path, no INBOX
+N: [ 3] Enter list_store, flags=2
+N: [ 3] Callback enter list_store
+  Inbox
+N: [ 3] Callback leave list_store
+N: [ 3] Leave list_store
+N: [ 2] Callback leave connect_store
+N: [ 2] Leave connect_store
+F: * OK IMAP4 ready
+F: >>> 1 CAPABILITY
+F: * CAPABILITY IMAP4rev1 XLIST SPECIAL-USE LITERAL+ STARTTLS APPENDLIMIT=71680000 XAPPLEPUSHSERVICE UIDPLUS X-CM-EXT-1 SASL-IR AUTH=PLAIN AUTH=LOGIN AUTH=XOAUTH2 ID STARTTLS
+F: 1 OK completed
+F: >>> 2 STARTTLS
+F: 2 OK completed
+Connection is now encrypted
+F: >>> 3 CAPABILITY
+F: * CAPABILITY IMAP4rev1 XLIST SPECIAL-USE LITERAL+ STARTTLS APPENDLIMIT=71680000 XAPPLEPUSHSERVICE UIDPLUS X-CM-EXT-1 SASL-IR AUTH=PLAIN AUTH=LOGIN AUTH=XOAUTH2 ID
+F: 3 OK completed
+Logging in...
+Authenticating with SASL mechanism PLAIN...
+F: >>> 4 AUTHENTICATE PLAIN <authdata>
+F: 4 OK LOGIN completed
+F: [ 1] Callback enter connect_store, sts=0
+pattern '*' (effective '*'): Path, no INBOX
+F: [ 4] Enter list_store, flags=2
+F: >>> 5 LIST "" "*"
+F: [ 4] Leave list_store
+F: [ 1] Callback leave connect_store
+F: * LIST () "/" "INBOX"
+F: * LIST (\Drafts) "/" "&g0l6P3ux-"
+F: * LIST (\Sent) "/" "&XfJT0ZAB-"
+F: * LIST (\Trash) "/" "&XfJSIJZk-"
+F: * LIST (\Junk) "/" "&V4NXPpCuTvY-"
+F: * LIST () "/" "&dcVr0mWHTvZZOQ-"
+F: 5 OK LIST Completed
+F: [ 4] Callback enter list_store
+  &dcVr0mWHTvZZOQ-
+  &V4NXPpCuTvY-
+  &XfJSIJZk-
+  &XfJT0ZAB-
+  &g0l6P3ux-
+  INBOX
+F: Enter select_box, name=INBOX
+F: Leave select_box, ret=0
+N: Enter select_box, name=INBOX
+N: Leave select_box, ret=0
+N: Called get_box_path, ret=/home/yizhi.fzh/Maildir/Inbox/
+Opening far side box INBOX...
+F: [ 5] Enter open_box
+F: >>> 6 SELECT "INBOX"
+F: [ 5] Leave open_box
+Opening near side box INBOX...
+N: [ 6] Enter open_box
+N: [ 6] Callback enter open_box, sts=0, uidvalidity=1697339138
+N: [ 6] Callback leave open_box
+N: [ 6] Leave open_box
+F: [ 4] Callback leave list_store
+F: 6 NO SELECT Unsafe Login. Please contact kefu@188.com for help
+F: [ 5] Callback enter open_box, sts=2, uidvalidity=4294967295
+Creating far side box INBOX...
+F: [ 7] Enter create_box
+F: >>> 7 CREATE "INBOX"
+F: [ 7] Leave create_box
+F: [ 5] Callback leave open_box
+F: 7 NO CREATE Folder exist
+F: [ 7] Callback enter create_box, sts=2
+F: [ 8] Enter cancel_cmds
+F: [ 8] Callback enter cancel_cmds
+F: [ 8] Callback leave cancel_cmds
+F: [ 8] Leave cancel_cmds
+N: [ 9] Enter cancel_cmds
+N: [ 9] Callback enter cancel_cmds
+F: Enter select_box, name=&V4NXPpCuTvY-
+F: Leave select_box, ret=0
+N: Enter select_box, name=&V4NXPpCuTvY-
+N: Leave select_box, ret=0
+N: Called get_box_path, ret=/home/yizhi.fzh/Maildir/&V4NXPpCuTvY-
+Opening far side box &V4NXPpCuTvY-...
+F: [ 10] Enter open_box
+F: >>> 8 SELECT "&V4NXPpCuTvY-"
+F: [ 10] Leave open_box
+Opening near side box &V4NXPpCuTvY-...
+N: [ 9] Callback leave cancel_cmds
+N: [ 9] Leave cancel_cmds
+F: [ 7] Callback leave create_box
+F: 8 NO SELECT Unsafe Login. Please contact kefu@188.com for help
+F: [ 10] Callback enter open_box, sts=2, uidvalidity=4294967295
+F: Enter select_box, name=&XfJSIJZk-
+F: Leave select_box, ret=0
+N: Enter select_box, name=&XfJSIJZk-
+N: Leave select_box, ret=0
+N: Called get_box_path, ret=/home/yizhi.fzh/Maildir/&XfJSIJZk-
+Opening far side box &XfJSIJZk-...
+F: [ 11] Enter open_box
+F: >>> 9 SELECT "&XfJSIJZk-"
+F: [ 11] Leave open_box
+Opening near side box &XfJSIJZk-...
+F: [ 10] Callback leave open_box
+F: 9 NO SELECT Unsafe Login. Please contact kefu@188.com for help
+F: [ 11] Callback enter open_box, sts=2, uidvalidity=4294967295
+F: Enter select_box, name=&XfJT0ZAB-
+F: Leave select_box, ret=0
+N: Enter select_box, name=&XfJT0ZAB-
+N: Leave select_box, ret=0
+N: Called get_box_path, ret=/home/yizhi.fzh/Maildir/&XfJT0ZAB-
+Opening far side box &XfJT0ZAB-...
+F: [ 12] Enter open_box
+F: >>> 10 SELECT "&XfJT0ZAB-"
+F: [ 12] Leave open_box
+Opening near side box &XfJT0ZAB-...
+F: [ 11] Callback leave open_box
+F: 10 NO SELECT Unsafe Login. Please contact kefu@188.com for help
+F: [ 12] Callback enter open_box, sts=2, uidvalidity=4294967295
+F: Enter select_box, name=&dcVr0mWHTvZZOQ-
+F: Leave select_box, ret=0
+N: Enter select_box, name=&dcVr0mWHTvZZOQ-
+N: Leave select_box, ret=0
+N: Called get_box_path, ret=/home/yizhi.fzh/Maildir/&dcVr0mWHTvZZOQ-
+Opening far side box &dcVr0mWHTvZZOQ-...
+F: [ 13] Enter open_box
+F: >>> 11 SELECT "&dcVr0mWHTvZZOQ-"
+F: [ 13] Leave open_box
+Opening near side box &dcVr0mWHTvZZOQ-...
+F: [ 12] Callback leave open_box
+F: 11 NO SELECT Unsafe Login. Please contact kefu@188.com for help
+F: [ 13] Callback enter open_box, sts=2, uidvalidity=4294967295
+F: Enter select_box, name=&g0l6P3ux-
+F: Leave select_box, ret=0
+N: Enter select_box, name=&g0l6P3ux-
+N: Leave select_box, ret=0
+N: Called get_box_path, ret=/home/yizhi.fzh/Maildir/&g0l6P3ux-
+Opening far side box &g0l6P3ux-...
+F: [ 14] Enter open_box
+F: >>> 12 SELECT "&g0l6P3ux-"
+F: [ 14] Leave open_box
+Opening near side box &g0l6P3ux-...
+F: [ 13] Callback leave open_box
+F: 12 NO SELECT Unsafe Login. Please contact kefu@188.com for help
+F: [ 14] Callback enter open_box, sts=2, uidvalidity=4294967295
+F: Enter select_box, name=Inbox
+F: Leave select_box, ret=0
+N: Enter select_box, name=Inbox
+N: Leave select_box, ret=0
+N: Called get_box_path, ret=/home/yizhi.fzh/Maildir/Inbox
+Opening far side box Inbox...
+Opening near side box Inbox...
+N: [ 15] Enter open_box
+N: [ 15] Callback enter open_box, sts=0, uidvalidity=1697339138
+Creating far side box Inbox...
+F: [ 16] Enter create_box
+F: [ 16] Callback enter create_box, sts=2
+F: [ 17] Enter cancel_cmds
+F: [ 17] Callback enter cancel_cmds
+F: [ 17] Callback leave cancel_cmds
+F: [ 17] Leave cancel_cmds
+N: [ 18] Enter cancel_cmds
+N: [ 18] Callback enter cancel_cmds
+N: [ 18] Callback leave cancel_cmds
+N: [ 18] Leave cancel_cmds
+F: [ 16] Callback leave create_box
+F: [ 16] Leave create_box
+N: [ 15] Callback leave open_box
+N: [ 15] Leave open_box
+F: [ 19] Enter cancel_cmds
+F: [ 19] Callback enter cancel_cmds
+F: Enter free_store
+F: Leave free_store
+F: [ 19] Callback leave cancel_cmds
+F: [ 19] Leave cancel_cmds
+N: [ 20] Enter cancel_cmds
+N: [ 20] Callback enter cancel_cmds
+N: Enter free_store
+N: Leave free_store
+N: [ 20] Callback leave cancel_cmds
+N: [ 20] Leave cancel_cmds
+F: >>> 13 LOGOUT
+F: [ 14] Callback leave open_box
+F: * BYE IMAP4rev1 Server logging out
+F: 13 OK LOGOUT completed

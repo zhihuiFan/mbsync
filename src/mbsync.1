@@ -1,0 +1,823 @@
+.\" mbsync - mailbox synchronizer
+.\" Copyright (C) 2000-2002 Michael R. Elkins <me@mutt.org>
+.\" Copyright (C) 2002-2004,2011-2015 Oswald Buddenhagen <ossi@users.sf.net>
+.\" Copyright (C) 2004 Theodore Y. Ts'o <tytso@mit.edu>
+.\"
+.\"  This program is free software; you can redistribute it and/or modify
+.\"  it under the terms of the GNU General Public License as published by
+.\"  the Free Software Foundation; either version 2 of the License, or
+.\"  (at your option) any later version.
+.\"
+.\"  This program is distributed in the hope that it will be useful,
+.\"  but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\"  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\"  GNU General Public License for more details.
+.\"
+.\"  You should have received a copy of the GNU General Public License
+.\"  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+.\"
+.\" As a special exception, mbsync may be linked with the OpenSSL library,
+.\" despite that library's more restrictive license.
+.
+.TH mbsync 1 "2015 Mar 22"
+.
+.SH NAME
+mbsync - synchronize IMAP4 and Maildir mailboxes
+.
+.SH SYNOPSIS
+\fBmbsync\fR [\fIoptions\fR ...] {{\fIchannel\fR[\fB:\fIbox\fR[{\fB,\fR|\fB\\n\fR}...]]|\fIgroup\fR} ...|\fB-a\fR}
+.
+.SH DESCRIPTION
+\fBmbsync\fR is a command line application which synchronizes mailboxes;
+currently Maildir and IMAP4 mailboxes are supported.
+New messages, message deletions and flag changes can be propagated both ways;
+the operation set can be selected in a fine-grained manner.
+.br
+Synchronization is based on unique message identifiers (UIDs), so no
+identification conflicts can occur (unlike with some other mail synchronizers).
+OTOH, \fBmbsync\fR is susceptible to UID validity changes (but will recover
+just fine if the change is unfounded).
+Synchronization state is kept in one local text file per mailbox pair;
+these files are protected against concurrent \fBmbsync\fR processes.
+Mailboxes can be safely modified while \fBmbsync\fR operates
+(see \fBINHERENT PROBLEMS\fR below for a minor exception).
+Multiple replicas of each mailbox can be maintained.
+.
+.SH OPTIONS
+.TP
+\fB-c\fR, \fB--config\fR \fIfile\fR
+Read configuration from \fIfile\fR.
+By default, the configuration is read from ~/.mbsyncrc.
+.TP
+\fB-a\fR, \fB--all\fR
+Select all configured channels. Any channel/group specifications on the command
+line are ignored.
+.TP
+\fB-l\fR, \fB--list\fR
+Don't synchronize anything, but list all mailboxes in the selected channels
+and exit.
+.TP
+\fB-C\fR[\fBf\fR][\fBn\fR], \fB--create\fR[\fB-far\fR|\fB-near\fR]
+Override any \fBCreate\fR options from the config file. See below.
+.TP
+\fB-R\fR[\fBf\fR][\fBn\fR], \fB--remove\fR[\fB-far\fR|\fB-near\fR]
+Override any \fBRemove\fR options from the config file. See below.
+.TP
+\fB-X\fR[\fBf\fR][\fBn\fR], \fB--expunge\fR[\fB-far\fR|\fB-near\fR]
+Override any \fBExpunge\fR options from the config file. See below.
+.TP
+{\fB-n\fR|\fB-N\fR|\fB-d\fR|\fB-f\fR|\fB-0\fR|\fB-F\fR},\
+ {\fB--new\fR|\fB--renew\fR|\fB--delete\fR|\fB--flags\fR|\fB--noop\fR|\fB--full\fR}
+.TP
+\r{\fB-L\fR|\fB-H\fR}[\fBn\fR][\fBN\fR][\fBd\fR][\fBf\fR],\
+ {\fB--pull\fR|\fB--push\fR}[\fB-new\fR|\fB-renew\fR|\fB-delete\fR|\fB-flags\fR]
+Override any \fBSync\fR options from the config file. See below.
+.TP
+\fB-h\fR, \fB--help\fR
+Display a summary of command line options.
+.TP
+\fB-v\fR, \fB--version\fR
+Display version information.
+.TP
+\fB-V\fR, \fB--verbose\fR
+Enable \fIverbose\fR mode, which displays what is currently happening.
+.TP
+\fB-D\fR[\fBC\fR][\fBd\fR|\fBD\fR][\fBm\fR][\fBM\fR][\fBn\fR|\fBN\fR][\fBs\fR]\fR]\fR,\
+ \fB--debug\fR[\fB-crash\fR|\fB-driver\fR|\fB-driver-all\fR|\fB-maildir\fR|\fB-main\fR|\fB-net\fR|\fB-net-all\fR|\fB-sync\fR]
+Enable debugging categories:
+.in +4
+\fBC\fR, \fBcrash\fR - use built-in crash handler
+.br
+\fBd\fR, \fBdriver\fR - print driver calls (metadata only)
+.br
+\fBD\fR, \fBdriver-all\fR - print driver calls (including messages)
+.br
+\fBm\fR, \fBmaildir\fR - print maildir debug info
+.br
+\fBM\fR, \fBmain\fR - print main debug info
+.br
+\fBn\fR, \fBnet\fR - print network traffic (protocol only)
+.br
+\fBN\fR, \fBnet-all\fR - print network traffic (including payloads)
+.br
+\fBs\fR, \fBsync\fR - print synchronization debug info
+.in -4
+All categories except \fBcrash\fR implictly enable \fIverbose\fR mode.
+Without category specification, all categories except net-all are enabled.
+.TP
+\fB-q\fR, \fB--quiet\fR
+Suppress progress counters (this is implicit if stdout is no TTY,
+or any debugging categories are enabled) and notices.
+If specified twice, suppress warning messages as well.
+.
+.SH CONFIGURATION
+The configuration file is mandatory; \fBmbsync\fR will not run without it.
+Lines starting with a hash mark (\fB#\fR) are comments and are ignored entirely.
+Configuration items are keywords followed by one or more arguments;
+arguments containing spaces must be enclosed in double quotes (\fB"\fR),
+and literal double quotes and backslashes (\fB\\\fR) must be backslash-escaped.
+All keywords (including those used as arguments) are case-insensitive.
+Bash-like home directory expansion using the tilde (\fB~\fR) is supported
+in all options which represent local paths.
+There are a few global options, the others apply to particular sections.
+Sections begin with a section-starting keyword and are terminated by an empty
+line or end of file.
+Every section defines an object with an identifier unique within that
+object class.
+.P
+There are two basic object classes: Stores and Channels. A Store defines
+a collection of mailboxes; basically a folder, either local or remote.
+A Channel connects two Stores, describing the way the two are synchronized.
+.br
+There are two auxiliary object classes: Accounts and Groups. An Account
+describes the connection part of network Stores, so server configurations can
+be shared between multiple Stores. A Group aggregates multiple Channels to
+save typing on the command line.
+.P
+File system locations (in particular, \fBPath\fR and \fBInbox\fR) use the
+Store's internal path separators, which may be slashes, periods, etc., or
+even combinations thereof.
+.br
+Mailbox names, OTOH, always use canonical path separators, which are
+Unix-like forward slashes.
+.
+.SS All Stores
+These options can be used in all supported Store types.
+.br
+In this context, the term "remote" describes the second Store within a Channel,
+and not necessarily a remote server.
+.br
+The special mailbox \fBINBOX\fR exists in every Store; its physical location
+in the file system is Store type specific.
+.
+.TP
+\fBPath\fR \fIpath\fR
+The location of the Store in the (server's) file system.
+If this is no absolute path, the reference point is Store type specific.
+This string is prepended to the mailbox names addressed in this Store,
+but is not considered part of them; this is important for \fBPatterns\fR
+and \fBCreate\fR in the Channels section.
+Note that you \fBmust\fR append a slash if you want to specify an entire
+directory.
+(Default: none)
+.
+.TP
+\fBMaxSize\fR \fIsize\fR[\fBk\fR|\fBm\fR][\fBb\fR]
+Messages larger than \fIsize\fR will have only a small placeholder message
+propagated into this Store. To propagate the full message, it must be
+flagged in either Store; that can be done retroactively, in which case
+the \fBReNew\fR operation needs to be executed instead of \fBNew\fR.
+This is useful for avoiding downloading messages with large attachments
+unless they are actually needed.
+Caveat: Setting a size limit on a Store you never read directly (which is
+typically the case for servers) is not recommended, as you may never
+notice that affected messages were not propagated to it.
+.br
+\fBK\fR and \fBM\fR can be appended to the size to specify KiBytes resp.
+MeBytes instead of bytes. \fBB\fR is accepted but superfluous.
+If \fIsize\fR is 0, the maximum message size is \fBunlimited\fR.
+(Default: \fI0\fR)
+.
+.TP
+\fBMapInbox\fR \fImailbox\fR
+Create a virtual mailbox (relative to \fBPath\fR) which aliases
+the \fBINBOX\fR. Makes sense in conjunction with \fBPatterns\fR in the
+Channels section, though with a Maildir near side, you probably want to
+place \fBInbox\fR under \fBPath\fR instead.
+This virtual mailbox does not support subfolders.
+.
+.TP
+\fBFlatten\fR \fIdelim\fR
+Flatten the hierarchy within this Store by substituting the canonical
+hierarchy delimiter \fB/\fR with \fIdelim\fR.
+This can be useful when the MUA used to access the Store provides
+suboptimal handling of hierarchical mailboxes, as is the case with
+\fBMutt\fR.
+A common choice for the delimiter is \fB.\fR.
+.br
+Note that flattened sub-folders of the \fBINBOX\fR always end up
+under \fBPath\fR, including the "INBOX\fIdelim\fR" prefix.
+.
+.TP
+\fBTrash\fR \fImailbox\fR
+Specifies a mailbox (relative to \fBPath\fR) to copy deleted messages to
+prior to expunging.
+See \fBRECOMMENDATIONS\fR and \fBINHERENT PROBLEMS\fR below.
+(Default: none)
+.
+.TP
+\fBTrashNewOnly\fR \fByes\fR|\fBno\fR
+When trashing, copy only not yet propagated messages. This makes sense if the
+remote Store has a \fBTrash\fR as well (with \fBTrashNewOnly\fR \fBno\fR).
+(Default: \fBno\fR)
+.
+.TP
+\fBTrashRemoteNew\fR \fByes\fR|\fBno\fR
+When expunging the remote Store, copy not yet propagated messages to this
+Store's \fBTrash\fR. When using this, the remote Store does not need an own
+\fBTrash\fR at all, yet all messages are archived.
+(Default: \fBno\fR)
+.
+.SS Maildir Stores
+The reference point for relative \fBPath\fRs is the current working directory.
+.P
+As \fBmbsync\fR needs UIDs, but no standardized UID storage scheme exists for
+Maildir, \fBmbsync\fR supports two schemes, each with its pros and cons.
+.br
+The \fBnative\fR scheme is stolen from the latest Maildir patches to \fBc-client\fR
+and is therefore compatible with \fBpine\fR. The UID validity is stored in a
+file named .uidvalidity; the UIDs are encoded in the file names of the messages.
+.br
+The \fBalternative\fR scheme is based on the UID mapping used by \fBisync\fR
+versions 0.8 and 0.9.x. The invariant parts of the file names of the messages
+are used as keys into a Berkeley database named .isyncuidmap.db, which holds
+the UID validity as well.
+.br
+The \fBnative\fR scheme is faster, more space efficient, endianness independent
+and "human readable", but will be disrupted if a message is copied from another
+mailbox without getting a new file name; this would result in duplicated UIDs
+sooner or later, which in turn results in a UID validity change, making
+synchronization fail.
+The \fBalternative\fR scheme would fail if a MUA changed a message's file name
+in a part \fBmbsync\fR considers invariant; this would be interpreted as a
+message deletion and a new message, resulting in unnecessary traffic.
+.br
+\fBMutt\fR is known to work fine with both schemes.
+.br
+Use \fBmdconvert\fR to convert mailboxes from one scheme to the other.
+.
+.TP
+\fBMaildirStore\fR \fIname\fR
+Define the Maildir Store \fIname\fR, opening a section for its parameters.
+.
+.TP
+\fBAltMap\fR \fByes\fR|\fBno\fR
+Use the \fBalternative\fR UID storage scheme for mailboxes in this Store.
+This does not affect mailboxes that do already have a UID storage scheme;
+use \fBmdconvert\fR to change it.
+See \fBRECOMMENDATIONS\fR below.
+(Default: \fBno\fR)
+.
+.TP
+\fBInbox\fR \fIpath\fR
+The location of the \fBINBOX\fR. This is \fInot\fR relative to \fBPath\fR,
+but it is allowed to place the \fBINBOX\fR inside the \fBPath\fR.
+(Default: \fI~/Maildir\fR)
+.
+.TP
+\fBInfoDelimiter\fR \fIdelim\fR
+The character used to delimit the info field from a message's basename.
+The Maildir standard defines this to be the colon, but this is incompatible
+with DOS/Windows file systems.
+(Default: the value of \fBFieldDelimiter\fR)
+.
+.TP
+\fBSubFolders\fR \fBVerbatim\fR|\fBMaildir++\fR|\fBLegacy\fR
+The on-disk folder naming style used for hierarchical mailboxes.
+This option has no effect when \fBFlatten\fR is used.
+.br
+Suppose mailboxes with the canonical paths \fBtop/sub/subsub\fR and
+\fBINBOX/sub/subsub\fR, the styles will yield the following on-disk paths:
+.br
+\fBVerbatim\fR - \fIPath\fB/top/sub/subsub\fR and \fIInbox\fB/sub/subsub\fR
+(this is the style you probably want to use)
+.br
+\fBMaildir++\fR - \fIInbox\fB/.top.sub.subsub\fR and \fIInbox\fB/..sub.subsub\fR
+(this style is compatible with Courier and Dovecot - but note that
+the mailbox metadata format is \fInot\fR compatible).
+Note that attempts to set \fBPath\fR are rejected in this mode.
+.br
+\fBLegacy\fR - \fIPath\fB/top/.sub/.subsub\fR and \fIInbox\fB/.sub/.subsub\fR
+(this is \fBmbsync\fR's historical style)
+.br
+(Default: unset; will error out when sub-folders are encountered)
+.
+.SS IMAP4 Accounts
+.TP
+\fBIMAPAccount\fR \fIname\fR
+Define the IMAP4 Account \fIname\fR, opening a section for its parameters.
+.
+.TP
+\fBHost\fR \fIhost\fR
+Specify the DNS name or IP address of the IMAP server.
+.br
+If \fBTunnel\fR is used, this setting is needed only if \fBSSLType\fR is
+not \fBNone\fR and \fBCertificateFile\fR is not used,
+in which case the host name is used for certificate subject verification.
+.
+.TP
+\fBPort\fR \fIport\fR
+Specify the TCP port number of the IMAP server.  (Default: 143 for IMAP,
+993 for IMAPS)
+.br
+If \fBTunnel\fR is used, this setting is ignored.
+.
+.TP
+\fBTimeout\fR \fItimeout\fR
+Specify the connect and data timeout for the IMAP server in seconds.
+Zero means unlimited.
+(Default: \fI20\fR)
+.
+.TP
+\fBUser\fR \fIusername\fR
+Specify the login name on the IMAP server.
+.
+.TP
+\fBUserCmd\fR [\fB+\fR]\fIcommand\fR
+Specify a shell command to obtain a user rather than specifying a
+user directly. This allows you to script retrieving user names.
+.br
+The command must produce exactly one line on stdout; the trailing newline
+is optional.
+Prepend \fB+\fR to the command to indicate that it produces TTY output
+(e.g., a prompt); failure to do so will merely produce messier output.
+Remember to backslash-escape double quotes and backslashes embedded into
+the command.
+.
+.TP
+\fBPass\fR \fIpassword\fR
+Specify the password for \fIusername\fR on the IMAP server.
+Note that this option is \fInot\fR required.
+If neither a password nor a password command is specified in the
+configuration file, \fBmbsync\fR will prompt you for a password.
+.
+.TP
+\fBPassCmd\fR [\fB+\fR]\fIcommand\fR
+Specify a shell command to obtain a password rather than specifying a
+password directly. This allows you to use password files and agents.
+.br
+See \fBUserCmd\fR above for details.
+.
+.TP
+\fBUseKeychain\fR \fByes\fR|\fBno\fR
+Whether to use the macOS Keychain to obtain the password.
+(Default: \fBno\fR)
+.IP
+The neccessary keychain item can be created this way:
+.RS
+.IP
+.nh
+.B security add-internet-password \-r imap \-s
+.I Host
+.B \-a
+.I User
+.B \-w
+.I password
+[
+.B \-T
+.I /path/to/mbsync
+]
+.hy
+.RE
+.
+.TP
+\fBTunnel\fR \fIcommand\fR
+Specify a command to run to establish a connection rather than opening a TCP
+socket.  This allows you to run an IMAP session over an SSH tunnel, for
+example.
+.
+.TP
+\fBAuthMechs\fR \fItype\fR ...
+The list of acceptable authentication mechanisms.
+In addition to the mechanisms listed in the SASL registry (link below),
+the legacy IMAP \fBLOGIN\fR mechanism is known.
+The wildcard \fB*\fR represents all mechanisms that are deemed secure
+enough for the current \fBSSLType\fR setting.
+The actually used mechanism is the most secure choice from the intersection
+of this list, the list supplied by the server, and the installed SASL modules.
+(Default: \fB*\fR)
+.
+.TP
+\fBSSLType\fR {\fBNone\fR|\fBSTARTTLS\fR|\fBIMAPS\fR}
+Select the connection security/encryption method:
+.br
+\fBNone\fR - no security.
+This is the default when \fBTunnel\fR is set, as tunnels are usually secure.
+.br
+\fBSTARTTLS\fR - security is established via the STARTTLS extension
+after connecting the regular IMAP port 143. Most servers support this,
+so it is the default (unless a tunnel is used).
+.br
+\fBIMAPS\fR - security is established by starting SSL/TLS negotiation
+right after connecting the secure IMAP port 993.
+.
+.TP
+\fBSSLVersions\fR [\fBSSLv3\fR] [\fBTLSv1\fR] [\fBTLSv1.1\fR] [\fBTLSv1.2\fR] [\fBTLSv1.3\fR]
+Select the acceptable SSL/TLS versions.
+Use old versions only when the server has problems with newer ones.
+(Default: [\fBTLSv1\fR] [\fBTLSv1.1\fR] [\fBTLSv1.2\fR] [\fBTLSv1.3\fR]).
+.
+.TP
+\fBSystemCertificates\fR \fByes\fR|\fBno\fR
+Whether the system's default CA (certificate authority) certificate
+store should be used to verify certificate trust chains. Disable this
+if you want to trust only hand-picked certificates.
+(Default: \fByes\fR)
+.
+.TP
+\fBCertificateFile\fR \fIpath\fR
+File containing additional X.509 certificates used to verify server
+identities.
+It may contain two types of certificates:
+.RS
+.IP Host
+These certificates are matched only against the received server certificate
+itself.
+They are always trusted, regardless of validity.
+A typical use case would be forcing acceptance of an expired certificate.
+.br
+These certificates may be obtained using the \fBmbsync-get-cert\fR tool;
+make sure to verify their fingerprints before trusting them, or transfer
+them securely from the server's network (if it can be trusted beyond the
+server itself).
+.IP CA
+These certificates are used as trust anchors when building the certificate
+chain for the received server certificate.
+They are used to supplant or supersede the system's trust store, depending
+on the \fBSystemCertificates\fR setting;
+it is not necessary and not recommended to specify the system's trust store
+itself here.
+The trust chains are fully validated.
+.RE
+.
+.TP
+\fBClientCertificate\fR \fIpath\fR
+File containing a client certificate to send to the server.
+\fBClientKey\fR should also be specified.
+.br
+Note that client certificate verification is usually not required,
+so it is unlikely that you need this option.
+.
+.TP
+\fBClientKey\fR \fIpath\fR
+File containing the private key corresponding to \fBClientCertificate\fR.
+.
+.TP
+\fBCipherString\fR \fIstring\fR
+Specify OpenSSL cipher string for connections secured with TLS up to
+version 1.2 (but not 1.3 and above).
+The format is described in \fBciphers\fR\|(1).
+(Default: empty, which implies system wide policy).
+.
+.TP
+\fBPipelineDepth\fR \fIdepth\fR
+Maximum number of IMAP commands which can be simultaneously in flight.
+Setting this to \fI1\fR disables pipelining.
+This is mostly a debugging option, but may also be used to limit average
+bandwidth consumption (GMail may require this if you have a very fast
+connection), or to spare flaky servers like M$ Exchange.
+(Default: \fIunlimited\fR)
+.
+.TP
+\fBDisableExtension\fR[\fBs\fR] \fIextension\fR ...
+Disable the use of specific IMAP extensions.
+This can be used to work around bugs in servers
+(and possibly \fBmbsync\fR itself).
+(Default: empty)
+.
+.SS IMAP Stores
+The reference point for relative \fBPath\fRs is whatever the server likes it
+to be; probably the user's $HOME or $HOME/Mail on that server. The location
+of \fBINBOX\fR is up to the server as well and is usually irrelevant.
+.TP
+\fBIMAPStore\fR \fIname\fR
+Define the IMAP4 Store \fIname\fR, opening a section for its parameters.
+.
+.TP
+\fBAccount\fR \fIaccount\fR
+Specify which IMAP4 Account to use. Instead of defining an Account and
+referencing it here, it is also possible to specify all the Account options
+directly in the Store's section - this makes sense if an Account is used for
+one Store only anyway.
+.
+.TP
+\fBUseNamespace\fR \fByes\fR|\fBno\fR
+Selects whether the server's first "personal" NAMESPACE should be prefixed to
+mailbox names. Disabling this makes sense for some broken IMAP servers.
+This option is meaningless if a \fBPath\fR was specified.
+(Default: \fByes\fR)
+.
+.TP
+\fBPathDelimiter\fR \fIdelim\fR
+Specify the server's hierarchy delimiter.
+(Default: taken from the server's first "personal" NAMESPACE)
+.br
+Do \fInot\fR abuse this to re-interpret the hierarchy.
+Use \fBFlatten\fR instead.
+.
+.TP
+\fBSubscribedOnly\fR \fByes\fR|\fBno\fR
+Selects whether to synchronize only mailboxes that are subscribed to on the
+IMAP server. In technical terms, if this option is set, \fBmbsync\fR will use
+the IMAP command LSUB instead of LIST to look for mailboxes in this Store.
+This option make sense only in conjunction with \fBPatterns\fR.
+(Default: \fBno\fR)
+.
+.SS Channels
+.TP
+\fBChannel\fR \fIname\fR
+Define the Channel \fIname\fR, opening a section for its parameters.
+.
+.TP
+{\fBFar\fR|\fBNear\fR} \fB:\fIstore\fB:\fR[\fImailbox\fR]
+Specify the far resp. near side Store to be connected by this Channel.
+If \fBPatterns\fR are specified, \fImailbox\fR is interpreted as a
+prefix which is not matched against the patterns, and which is not
+affected by mailbox list overrides.
+Otherwise, if \fImailbox\fR is omitted, \fBINBOX\fR is assumed.
+.
+.TP
+\fBPattern\fR[\fBs\fR] [\fB!\fR]\fIpattern\fR ...
+Instead of synchronizing only one mailbox pair, synchronize all mailboxes
+that match the \fIpattern\fR(s). The mailbox names are the same on the far
+and near side. Patterns are IMAP4 patterns, i.e., \fB*\fR matches anything
+and \fB%\fR matches anything up to the next hierarchy delimiter. Prepending
+\fB!\fR to a pattern makes it an exclusion. Multiple patterns can be specified
+(either by supplying multiple arguments or by using \fBPattern\fR multiple
+times); later matches take precedence.
+.br
+Note that \fBINBOX\fR is not matched by wildcards, unless it lives under
+\fBPath\fR.
+.br
+The mailbox list selected by \fBPatterns\fR can be overridden by a mailbox
+list in a channel reference (a \fBGroup\fR specification or the command line).
+.br
+Example: "\fBPatterns\fR\ \fI%\ !Trash\fR"
+.
+.TP
+\fBMaxSize\fR \fIsize\fR[\fBk\fR|\fBm\fR][\fBb\fR]
+Analogous to the homonymous option in the Stores section, but applies equally
+to Far and Near. Note that this actually modifies the Stores, so take care
+not to provide conflicting settings if you use the Stores in multiple Channels.
+.
+.TP
+\fBMaxMessages\fR \fIcount\fR
+Sets the maximum number of messages to keep in each near side mailbox.
+This is useful for mailboxes where you keep a complete archive on the server,
+but want to mirror only the last messages (for instance, for mailing lists).
+The messages that were the first to arrive in the mailbox (independently of
+the actual date of the message) will be deleted first.
+Messages that are flagged (marked as important) and (by default) unread
+messages will not be automatically deleted.
+If \fIcount\fR is 0, the maximum number of messages is \fBunlimited\fR
+(Default: \fI0\fR).
+.
+.TP
+\fBExpireUnread\fR \fByes\fR|\fBno\fR
+Selects whether unread messages should be affected by \fBMaxMessages\fR.
+Normally, unread messages are considered important and thus never expired.
+This ensures that you never miss new messages even after an extended absence.
+However, if your archive contains large amounts of unread messages by design,
+treating them as important would practically defeat \fBMaxMessages\fR. In this
+case you need to enable this option.
+(Default: \fBno\fR).
+.
+.TP
+\fBSync\fR {\fBNone\fR|[\fBPull\fR] [\fBPush\fR] [\fBNew\fR] [\fBReNew\fR] [\fBDelete\fR] [\fBFlags\fR]|\fBAll\fR}
+Select the synchronization operation(s) to perform:
+.br
+\fBPull\fR - propagate changes from far to near side.
+.br
+\fBPush\fR - propagate changes from near to far side.
+.br
+\fBNew\fR - propagate newly appeared messages.
+.br
+\fBReNew\fR - upgrade placeholders to full messages. Useful only with
+a configured \fBMaxSize\fR.
+.br
+\fBDelete\fR - propagate message deletions. This applies only to messages that
+are actually gone, i.e., were expunged. The affected messages in the remote
+Store are marked as deleted only, i.e., they won't be really deleted until
+that Store is expunged.
+.br
+\fBFlags\fR - propagate flag changes. Note that Deleted/Trashed is a flag as
+well; this is particularly interesting if you use \fBmutt\fR with the
+maildir_trash option.
+.br
+\fBAll\fR (\fB--full\fR on the command line) - all of the above.
+This is the global default.
+.br
+\fBNone\fR (\fB--noop\fR on the command line) - don't propagate anything.
+Useful if you want to expunge only.
+.IP
+\fBPull\fR and \fBPush\fR are direction flags, while \fBNew\fR, \fBReNew\fR,
+\fBDelete\fR and \fBFlags\fR are type flags. The two flag classes make up a
+two-dimensional matrix (a table). Its cells are the individual actions to
+perform. There are two styles of asserting the cells:
+.br
+In the first style, the flags select entire rows/colums in the matrix. Only
+the cells which are selected both horizontally and vertically are asserted.
+Specifying no flags from a class is like specifying all flags from this class.
+For example, "\fBSync\fR\ \fBPull\fR\ \fBNew\fR\ \fBFlags\fR" will propagate
+new messages and flag changes from the far side to the near side,
+"\fBSync\fR\ \fBNew\fR\ \fBDelete\fR" will propagate message arrivals and
+deletions both ways, and "\fBSync\fR\ \fBPush\fR" will propagate all changes
+from the near side to the far side.
+.br
+In the second style, direction flags are concatenated with type flags; every
+compound flag immediately asserts a cell in the matrix. In addition to at least
+one compound flag, the individual flags can be used as well, but as opposed to
+the first style, they immediately assert all cells in their respective
+row/column. For example,
+"\fBSync\fR\ \fBPullNew\fR\ \fBPullDelete\fR\ \fBPush\fR" will propagate
+message arrivals and deletions from the far side to the near side and any
+changes from the near side to the far side.
+Note that it is not allowed to assert a cell in two ways, e.g.
+"\fBSync\fR\ \fBPullNew\fR\ \fBPull\fR" and
+"\fBSync\fR\ \fBPullNew\fR\ \fBDelete\fR\ \fBPush\fR" induce error messages.
+.
+.TP
+\fBCreate\fR {\fBNone\fR|\fBFar\fR|\fBNear\fR|\fBBoth\fR}
+Automatically create missing mailboxes [on the far/near side].
+Otherwise print an error message and skip that mailbox pair if a mailbox
+and the corresponding sync state does not exist.
+(Global default: \fBNone\fR)
+.
+.TP
+\fBRemove\fR {\fBNone\fR|\fBFar\fR|\fBNear\fR|\fBBoth\fR}
+Propagate mailbox deletions [to the far/near side].
+Otherwise print an error message and skip that mailbox pair if a mailbox
+does not exist but the corresponding sync state does.
+.br
+For MailDir mailboxes it is sufficient to delete the cur/ subdirectory to
+mark them as deleted. This ensures compatibility with \fBSyncState *\fR.
+.br
+Note that for safety, non-empty mailboxes are never deleted.
+.br
+(Global default: \fBNone\fR)
+.
+.TP
+\fBExpunge\fR {\fBNone\fR|\fBFar\fR|\fBNear\fR|\fBBoth\fR}
+Permanently remove all messages [on the far/near side] marked for deletion.
+See \fBRECOMMENDATIONS\fR below.
+(Global default: \fBNone\fR)
+.
+.TP
+\fBCopyArrivalDate\fR {\fByes\fR|\fBno\fR}
+Selects whether their arrival time should be propagated together with
+the messages.
+Enabling this makes sense in order to keep the time stamp based message
+sorting intact.
+Note that IMAP does not guarantee that the time stamp (termed \fBinternal
+date\fR) is actually the arrival time, but it is usually close enough.
+(Default: \fBno\fR)
+.
+.P
+\fBSync\fR, \fBCreate\fR, \fBRemove\fR, \fBExpunge\fR,
+\fBMaxMessages\fR, and \fBCopyArrivalDate\fR
+can be used before any section for a global effect.
+The global settings are overridden by Channel-specific options,
+which in turn are overridden by command line switches.
+.
+.TP
+\fBSyncState\fR {\fB*\fR|\fIpath\fR}
+Set the location of this Channel's synchronization state files.
+\fB*\fR means that the state should be saved in a file named .mbsyncstate
+in the near side mailbox itself; this has the advantage that you do not need
+to handle the state file separately if you delete the mailbox, but it works
+only with Maildir mailboxes, obviously.
+Otherwise this is interpreted as a string to prepend to the near side mailbox
+name to make up a complete path.
+.br
+This option can be used outside any section for a global effect. In this case
+the appended string is made up according to the pattern
+\fB:\fIfar-store\fB:\fIfar-box\fB_:\fInear-store\fB:\fInear-box\fR
+(see also \fBFieldDelimiter\fR below).
+.br
+(Global default: \fI~/.mbsync/\fR).
+.
+.SS Groups
+.TP
+\fBGroup\fR \fIname\fR [\fIchannel\fR[\fB:\fIbox\fR[\fB,\fR...]]] ...
+Define the Group \fIname\fR, opening a section for its parameters.
+Note that even though Groups have an own namespace, they will "hide" Channels
+with the same name on the command line.
+.br
+One or more Channels can be specified on the same line.
+.br
+If you supply one or more \fIbox\fRes to a \fIchannel\fR, they will be used
+instead of what is specified in the Channel's Patterns.
+The same can be done on the command line, except that there newlines can be
+used as mailbox name separators as well.
+.
+.TP
+\fBChannel\fR[\fBs\fR] \fIchannel\fR[\fB:\fIbox\fR[\fB,\fR...]] ...
+Add the specified channels to the group. This option can be specified multiple
+times within a Group.
+.
+.SS Global Options
+.TP
+\fBFSync\fR \fByes\fR|\fBno\fR
+.br
+Selects whether \fBmbsync\fR performs forced flushing, which determines
+the level of data safety after system crashes and power outages.
+Disabling it is reasonably safe for file systems which are mounted with
+data=ordered mode.
+Enabling it is a wise choice for file systems mounted with data=writeback,
+in particular modern systems like ext4, btrfs and xfs. The performance impact
+on older file systems may be disproportionate.
+(Default: \fByes\fR)
+.
+.TP
+\fBFieldDelimiter\fR \fIdelim\fR
+The character to use to delimit fields in the string appended to a global
+\fBSyncState\fR.
+\fBmbsync\fR prefers to use the colon, but this is incompatible with
+DOS/Windows file systems.
+This option is meaningless for \fBSyncState\fR if the latter is \fB*\fR,
+obviously. However, it also determines the default of \fBInfoDelimiter\fR.
+(Global default: \fI;\fR on Windows, \fI:\fR everywhere else)
+.
+.TP
+\fBBufferLimit\fR \fIsize\fR[\fBk\fR|\fBm\fR][\fBb\fR]
+The per-Channel, per-direction instantaneous memory usage above which
+\fBmbsync\fR will refrain from using more memory. Note that this is no
+absolute limit, as even a single message can consume more memory than
+this.
+(Default: \fI10M\fR)
+.
+.SH CONSOLE OUTPUT
+If \fBmbsync\fR's output is connected to a console, it will print progress
+counters by default. The output will look like this:
+.P
+.in +4
+C: 1/2  B: 3/4  F: +13/13 *23/42 #0/0  N: +0/7 *0/0 #0/0
+.in -4
+.P
+This represents the cumulative progress over channels, boxes, and messages
+affected on the far and near side, respectively.
+The message counts represent added messages, messages with updated flags,
+and trashed messages, respectively.
+No attempt is made to calculate the totals in advance, so they grow over
+time as more information is gathered.
+.
+.SH RECOMMENDATIONS
+Make sure your IMAP server does not auto-expunge deleted messages - it is
+slow, and semantically somewhat questionable. Specifically, Gmail needs to
+be configured not to do it.
+.P
+By default, \fBmbsync\fR will not delete any messages - deletions are
+propagated by marking the messages as deleted on the remote store.
+Once you have verified that your setup works, you will typically want to
+set \fBExpunge\fR to \fBBoth\fR, so that deletions become effective.
+.P
+\fBmbsync\fR's built-in trash functionality relies on \fBmbsync\fR doing
+the expunging of deleted messages. This is the case when it propagates
+deletions of previously propagated messages, and the trash is on the target
+store (typically your IMAP server).
+.br
+However, when you intend \fBmbsync\fR to trash messages which were not
+propagated yet, the MUA must mark the messages as deleted without expunging
+them (e.g., \fBMutt\fR's \fBmaildir_trash\fR option). Note that most
+messages are propagated a long time before they are deleted, so this is a
+corner case you probably do not want to optimize for. This also implies
+that the \fBTrashNewOnly\fR and \fBTrashRemoteNew\fR options are typically
+not very useful.
+.P
+If your server supports auto-trashing (as Gmail does), it is probably a
+good idea to rely on that instead of \fBmbsync\fR's trash functionality.
+If you do that, and intend to synchronize the trash like other mailboxes,
+you should not use \fBmbsync\fR's \fBTrash\fR option at all.
+.P
+Use of the \fBTrash\fR option with M$ Exchange 2013 requires the use of
+\fBDisableExtension MOVE\fR due to a server bug.
+.P
+When using the more efficient default UID mapping scheme, it is important
+that the MUA renames files when moving them between Maildir folders.
+Mutt always does that, while mu4e needs to be configured to do it:
+.br
+.in +4
+(setq mu4e-change-filenames-when-moving t)
+.in -4
+.
+.SH INHERENT PROBLEMS
+Changes done after \fBmbsync\fR has retrieved the message list will not be
+synchronised until the next time \fBmbsync\fR is invoked.
+.P
+Using \fBTrash\fR on IMAP Stores without the UIDPLUS extension (notably,
+M$ Exchange up to at least 2010) bears a race condition: messages will be
+lost if they are marked as deleted after the message list was retrieved but
+before the mailbox is expunged.
+There is no risk as long as the IMAP mailbox is accessed by only one client
+(including \fBmbsync\fR) at a time.
+.
+.SH FILES
+.TP
+.B ~/.mbsyncrc
+Default configuration file
+.TP
+.B ~/.mbsync/
+Directory containing synchronization state files
+.
+.SH SEE ALSO
+mdconvert(1), mutt(1), maildir(5)
+.P
+Up to date information on \fBmbsync\fR can be found at http://isync.sf.net/
+.P
+SASL mechanisms are listed at
+http://www.iana.org/assignments/sasl-mechanisms/sasl-mechanisms.xhtml
+.
+.SH AUTHORS
+Originally written by Michael R. Elkins,
+rewritten and currently maintained by Oswald Buddenhagen,
+contributions by Theodore Y. Ts'o.
