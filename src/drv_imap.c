@@ -323,9 +323,8 @@ done_imap_cmd( imap_store_t *ctx, imap_cmd_t *cmd, int response )
 {
 	if (cmd->param.wait_check)
 		ctx->num_wait_check--;
-    if (cmd->param.done) {
-        cmd->param.done( ctx, cmd, response );
-    }
+    cmd->param.done( ctx, cmd, response );
+    // error("%p cmd %s done\n", (void *) ctx, cmd->cmd);
 	if (cmd->param.data) {
 		free( cmd->param.data );
 		ctx->buffer_mem -= cmd->param.data_len;
@@ -623,8 +622,22 @@ imap_exec( imap_store_t *ctx, imap_cmd_t *cmdp,
 	va_start( ap, fmt );
 	cmdp->cmd = imap_vprintf( fmt, ap );
 	va_end( ap );
+    // error("%p exec %s\n", (void *)ctx, cmdp->cmd);
 	submit_imap_cmd( ctx, cmdp );
 }
+
+static void id_cb( imap_store_t *ctx, imap_cmd_t *cmd, int response )
+{
+    error("ID_CB RESPONE: %d\n", response);
+    (void) ctx;
+    (void) cmd;
+    
+}
+
+static void call_id(imap_store_t *ctx, imap_cmd_t *cmdp) {
+    imap_exec( ctx, cmdp, id_cb, "ID (\"name\" \"mbsync\")");
+}
+
 
 static void
 transform_box_response( int *response )
@@ -2472,6 +2485,7 @@ imap_open_store_authenticate2( imap_store_t *ctx )
 		cmd = new_imap_cmd( sizeof(*cmd) );
 		cmd->param.cont = do_sasl_auth;
 		imap_exec( ctx, cmd, done_sasl_auth, enc ? "AUTHENTICATE %s %s" : "AUTHENTICATE %s", gotmech, enc );
+        call_id(ctx, NULL);
 		free( enc );
 		return;
 	  notsasl:
@@ -2495,6 +2509,7 @@ imap_open_store_authenticate2( imap_store_t *ctx )
 			warn( "*** IMAP Warning *** Password is being sent in the clear\n" );
 		imap_exec( ctx, NULL, imap_open_store_authenticate2_p2,
 		           "LOGIN \"%\\s\" \"%\\s\"", srvc->user, srvc->pass );
+        call_id(ctx, NULL);
 		return;
 	}
 	error( "IMAP error: server supports no acceptable authentication mechanism\n" );
@@ -3351,13 +3366,6 @@ typedef union {
 static void imap_list_store_p2( imap_store_t *, imap_cmd_t *, int );
 static void imap_list_store_p3( imap_store_t *, imap_list_store_state_t * );
 
-static void id_cb( imap_store_t *ctx, imap_cmd_t *cmd, int response )
-{
-    error("RESPONE: %d", response);
-    cancel_sent_imap_cmds(ctx);
-    (void) cmd;
-    
-}
 static void
 imap_list_store( store_t *gctx, int flags,
                  void (*cb)( int sts, string_list_t *boxes, void *aux ), void *aux )
@@ -3397,10 +3405,6 @@ imap_list_store( store_t *gctx, int flags,
 		           "%s \"\" INBOX*", cfg->use_lsub ? "LSUB" : "LIST" );
 	}
 	imap_list_store_p3( ctx, sts );
-    error("SEND MY ID");
-    imap_exec( ctx, NULL, id_cb, "ID (\"name\" \"mbsync\")");
-    sleep(1);
-    // cancel_pending_imap_cmds(ctx);
 }
 
 static void
